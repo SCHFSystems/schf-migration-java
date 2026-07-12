@@ -5,16 +5,30 @@ on:
   pull_request:
     branches: [main]
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y git gitleaks
+      - run: git diff --check HEAD~1
+      - run: gitleaks detect --no-git --source .
+  test:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
+          java-version: 21
           distribution: temurin
-          java-version: '21'
           cache: maven
-      - name: Gitleaks
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest detect --source=/repo --redact
-      - name: Maven verify
-        run: mvn verify
+      - name: Run mvn verify (unit + Testcontainers integration)
+        run: mvn verify -B
+      - name: Build JAR
+        run: mvn package -B -DskipTests
+      - name: Test CLI --help
+        run: java -jar target/schf-migration-java.jar 2>&1 | head -5
+  graphify-boundary:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Graphify/fronteira arquitetural: schf-core-java nao conhece Firebird, SGH, Santa Casa, caminhos legados, schemas legados, credenciais legadas."

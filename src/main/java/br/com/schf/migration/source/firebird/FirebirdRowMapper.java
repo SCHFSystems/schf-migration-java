@@ -5,6 +5,7 @@ import java.sql.ResultSetMetaData;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class FirebirdRowMapper {
@@ -32,7 +33,7 @@ public class FirebirdRowMapper {
             if (str.contains(".")) {
                 var parts = str.split("\\.");
                 if (parts[1].length() > 4) {
-                    return String.format("%.2f", num.doubleValue());
+                    return String.format(Locale.US, "%.2f", num.doubleValue());
                 }
             }
             return str;
