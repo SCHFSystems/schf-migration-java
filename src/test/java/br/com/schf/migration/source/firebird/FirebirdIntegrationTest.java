@@ -36,8 +36,6 @@ class FirebirdIntegrationTest {
     @SuppressWarnings("resource")
     private static final GenericContainer<?> FIREBIRD = new GenericContainer<>("firebirdsql/firebird:5")
         .withEnv("FIREBIRD_DATABASE", "SCHF_TEST")
-        .withEnv("FIREBIRD_PASSWORD", "schf_test_pwd")
-        .withEnv("ISC_PASSWORD", "schf_test_pwd")
         .withExposedPorts(FB_PORT);
 
     private static FirebirdSourceConfiguration config;
@@ -49,7 +47,7 @@ class FirebirdIntegrationTest {
         var port = FIREBIRD.getMappedPort(FB_PORT);
         var jdbcUrl = "jdbc:firebirdsql://" + host + ":" + port + "/SCHF_TEST";
         config = new FirebirdSourceConfiguration(
-            jdbcUrl, "sysdba", "schf_test_pwd",
+            jdbcUrl, "sysdba", "masterkey",
             "firebird-sgh", INSTANCE_ID,
             100, 10,
             Path.of(System.getProperty("java.io.tmpdir"), "schf-it-checkpoints"),
@@ -60,7 +58,7 @@ class FirebirdIntegrationTest {
     }
 
     private static void initSchema(String jdbcUrl) throws Exception {
-        try (var conn = DriverManager.getConnection(jdbcUrl, "sysdba", "schf_test_pwd");
+        try (var conn = DriverManager.getConnection(jdbcUrl, "sysdba", "masterkey");
              var stmt = conn.createStatement()) {
             stmt.execute("CREATE TABLE ORGANIZACAO (CODORG INTEGER PRIMARY KEY, NOME VARCHAR(100))");
             stmt.execute("INSERT INTO ORGANIZACAO VALUES (1, 'SCHF Synthetic')");
