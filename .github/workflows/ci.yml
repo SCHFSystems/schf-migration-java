@@ -32,4 +32,4 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Graphify/fronteira arquitetural: schf-core-java nao conhece Firebird, SGH, Santa Casa, caminhos legados, schemas legados, credenciais legadas."
+      - run: "echo 'Graphify boundary: schf-core-java must not know Firebird, SGH, or legacy credentials'"
