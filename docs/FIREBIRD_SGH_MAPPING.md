@@ -93,17 +93,25 @@ Count: 111 active (120 total, 9 excluded). Baseline 102 — close; 9-record diff
 | CONTAS_RECEBER_PAGAR.DATA_EMISSAO_DOC_REFERENTE | DATA_EMISSAO | issueDate | LocalDate ISO | Opcional |
 | CONTAS_RECEBER_PAGAR.DATA_VENCIMENTO | DATA_VENCIMENTO | dueDate | LocalDate ISO | Obrigatorio |
 | CONTAS_RECEBER_PAGAR.VALOR | VALOR | amount | Decimal 2 casas, positivo | Obrigatorio |
-| CONTAS_RECEBER_PAGAR.PREVISTO_REALIZADO / DATA_PAGAMENTO | PREVISTO_REALIZADO | status | 'P'+sem data=pending, com data=paid, 'R'=paid, excluído=cancelled | Opcional |
+| CONTAS_RECEBER_PAGAR.VALORPAGO | VALORPAGO | status | >0 AND DATA_PAGAMENTO NOT NULL = paid; no payment + overdue = overdue; else open | Obrigatorio |
 
 Query: `CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0`
 
-Count: ~39,722 total payable records (RCB_PGT='P'). Baseline 13,313 was from a limited extraction or had additional filters. Investigate.
+Count: 39,161 (non-excluded, VALOR>0). Baseline 13,313 came from SAF_CONTAS_PAGAR (5,961) + SAF_CONTAS_PAGAR_DUP (7,352) — a different module. See SGH_COUNT_AND_FILTER_RULES.md.
 
 ## Payment
 
-**Status**: UNRESOLVED (see SGH_PAYMENT_MAPPING_INVESTIGATION.md)
+**Status**: ONE_ACCUMULATED_PAYMENT_PER_PAYABLE (GATE B1.5)
 
-Previous migration mapped `CONTAS_RECEBER_PAGAR` with payment data embedded (DATA_PAGAMENTO, VALORPAGO, FORMA_PR) rather than a separate payment table. No standalone `PAGAMENTO` table exists.
+Payment data embedded in CONTAS_RECEBER_PAGAR: VALORPAGO, DATA_PAGAMENTO, FORMA_PR. No standalone PAGAMENTO table.
+
+| Condition | Cardinality | Count |
+|-----------|-------------|-------|
+| VALORPAGO > 0 | 1 accumulated payment per payable | 38,460 |
+| COD_FRACIONADO | Rare edge case (20 records) | 20 |
+| OPERACAO_BANCO per payable | 0 or 1 (never >1) | 37,298 linked |
+
+See SGH_PAYMENT_CARDINALITY.md for full analysis.
 
 ## External ID Strategy
 
@@ -116,7 +124,8 @@ Format: `UUID.nameUUIDFromBytes((sourceInstanceId + "|" + sourceTable + ":" + le
 | User | USUARIO | CODIGO_USUARIO | UUID(nameUUIDFromBytes(sourceId + "|USUARIO:" + CODIGO_USUARIO)) |
 | Category | SFN_CLASSIFICACAO_FINANCEIRA | ID_CLASSIFICACAO_FINANCEIRA | UUID(nameUUIDFromBytes(sourceId + "|SFN_CLASSIFICACAO_FINANCEIRA:" + ID)) |
 | Financial Account | CONTAS | CODIGO_CONTA | UUID(nameUUIDFromBytes(sourceId + "|CONTAS:" + CODIGO_CONTA)) |
-| Payable | CONTAS_RECEBER_PAGAR | TIPO_CONTA-CONTA-NUMERO_OPERACAO | UUID(nameUUIDFromBytes(sourceId + "|CONTAS_RECEBER_PAGAR:" + composite)) |
+| Payable | CONTAS_RECEBER_PAGAR | composite: RCB_PGT\|CODIGO_TIPO_CONTA\|CODIGO_CONTA\|DOC_RCB_PGT | UUID(nameUUIDFromBytes(sourceId + "\|CONTAS_RECEBER_PAGAR\|" + rcb_pgt + "\|" + tipo_conta + "\|" + conta + "\|" + doc)) |
+| Payment | CONTAS_RECEBER_PAGAR | same as payable + "\|PAYMENT" | UUID(nameUUIDFromBytes(sourceId + "\|CONTAS_RECEBER_PAGAR\|" + composite + "\|PAYMENT")) |
 
 ## Known Risks
 
@@ -124,6 +133,8 @@ Format: `UUID.nameUUIDFromBytes((sourceInstanceId + "|" + sourceTable + ":" + le
 2. **Null dates**: Some legacy dates may be NULL or default values.
 3. **CONTAS vs CONTA**: Both tables exist. CONTAS is the master entity register (all types). CONTA is a view/subset (only professionals, type 2).
 4. **Bank account type**: CODIGO_TIPO_CONTA = 6 for banks, not 3 as in earlier analysis.
-5. **Payables volume**: ~39,722 records with RCB_PGT='P'; only ~13k were in the previous bundle — additional filters unknown.
-6. **Orphan references**: Payables reference CODIGO_CONTA which may map to suppliers (type 3) or other entities.
-7. **Money precision**: Legacy values may have more than 2 decimal places.
+5. **Payables volume**: 39,161 (D) in CONTAS_RECEBER_PAGAR. Previous 13,313 baseline was from SAF_CONTAS_PAGAR (different table/module).
+6. **Account type resolution**: CODIGO_TIPO_CONTA=3 (15,398 records) maps to FORNECEDOR; types 2,7,15 (23,763 records) map to CONTAS (cost centers, professionals, others). Reference resolution must handle all types.
+7. **Bogus dates**: ~10 records with year < 2000 or > 2026 in vencimento; ~56 in emissao. Legacy BOGUS_YEARS rule applies.
+8. **PREVISTO_REALIZADO**: ALL NULL in this database. Status based on VALORPAGO + DATA_PAGAMENTO instead.
+9. **Money precision**: Legacy values may have more than 2 decimal places.
