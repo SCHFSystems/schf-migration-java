@@ -36,12 +36,20 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
             "SELECT COUNT(*) FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALORPAGO > 0");
         queries.put("count-users",
             "SELECT COUNT(*) FROM USUARIO WHERE EXCLUIDO IS NULL OR EXCLUIDO <> 'S'");
+        queries.put("count-counterparties",
+            "SELECT COUNT(*) FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S')");
         queries.put("suppliers",
             "SELECT * FROM FORNECEDOR ORDER BY CODIGO");
         queries.put("categories",
             "SELECT * FROM SFN_CLASSIFICACAO_FINANCEIRA WHERE EXCLUIR IS NULL OR EXCLUIR <> 'S' ORDER BY ID_CLASSIFICACAO_FINANCEIRA");
         queries.put("financial-accounts",
             "SELECT * FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6 AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') ORDER BY CODIGO_CONTA");
+        queries.put("counterparties",
+            "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 7, 15) ORDER BY CODIGO_TIPO_CONTA, CODIGO_CONTA");
+        queries.put("counterparties-suppliers",
+            "SELECT CODIGO AS CODIGO_CONTA, NOME, '3' AS CODIGO_TIPO_CONTA FROM FORNECEDOR");
+        queries.put("counterparties-colaboradores",
+            "SELECT CODIGO AS CODIGO_CONTA, NOME, CODIGO_TIPO_CONTA FROM COLABORADOR WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S')");
         queries.put("payables",
             "SELECT * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0 ORDER BY DATA_VENCIMENTO");
         queries.put("payments", buildPaymentsQuery());
@@ -85,7 +93,8 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
     @Override
     public Set<String> expectedSchemaTables() {
         return Set.of("FORNECEDOR", "USUARIO", "SFN_CLASSIFICACAO_FINANCEIRA",
-            "CONTAS", "SAF_CONTAS_PAGAR", "CONTAS_RECEBER_PAGAR", "OPERACAO_BANCO");
+            "CONTAS", "SAF_CONTAS_PAGAR", "CONTAS_RECEBER_PAGAR", "OPERACAO_BANCO",
+            "COLABORADOR", "CONTA");
     }
 
     @Override
@@ -94,6 +103,7 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
             case "suppliers" -> "codigo";
             case "categories" -> "id_classificacao_financeira";
             case "financial-accounts" -> "codigo_conta";
+            case "counterparties" -> "codigo_conta";
             case "payables" -> "doc_rcb_pgt";
             case "payments" -> "doc_rcb_pgt";
             case "users" -> "codigo_usuario";
@@ -107,6 +117,7 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         if (!mode.isLimited()) return 0;
         if ("organizations".equals(entityType)) return 1;
         if ("payments".equals(entityType)) return 0;
+        if ("counterparties".equals(entityType)) return 0;
         return 10;
     }
 
@@ -120,6 +131,12 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
             var suffix = "payments".equals(entityType) ? "|PAYMENT" : "";
             var key = sourceInstanceId + "|CONTAS_RECEBER_PAGAR|"
                 + rcbPgt + "|" + tipoConta + "|" + codConta + "|" + docRcbPgt + suffix;
+            return UUID.nameUUIDFromBytes(key.getBytes()).toString();
+        }
+        if ("counterparties".equals(entityType)) {
+            var tipoConta = row.getOrDefault("codigo_tipo_conta", "?").toString();
+            var codConta = row.getOrDefault("codigo_conta", "?").toString();
+            var key = sourceInstanceId + "|CONTAS|" + tipoConta + "|" + codConta;
             return UUID.nameUUIDFromBytes(key.getBytes()).toString();
         }
         return QueryCatalog.super.buildExternalId(sourceInstanceId, entityType, row);

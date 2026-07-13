@@ -4,6 +4,7 @@ import br.com.schf.migration.bundle.BundleComparer;
 import br.com.schf.migration.bundle.CanonicalBundleStreamingHandler;
 import br.com.schf.migration.bundle.CanonicalBundleValidator;
 import br.com.schf.migration.bundle.CanonicalBundleWriter;
+import br.com.schf.migration.contract.BundleContract;
 import br.com.schf.migration.source.ExtractionReport;
 import br.com.schf.migration.source.ProgressTracker;
 import br.com.schf.migration.source.RecordHandler;
@@ -13,6 +14,7 @@ import br.com.schf.migration.source.SyntheticSourceAdapter;
 import br.com.schf.migration.source.firebird.FirebirdCheckpointStore;
 import br.com.schf.migration.source.firebird.FirebirdSourceAdapter;
 import br.com.schf.migration.source.firebird.FirebirdSourceConfiguration;
+import br.com.schf.migration.source.firebird.SourceProfile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.nio.file.Files;
@@ -82,6 +84,12 @@ public final class MigrationCli {
         };
     }
 
+    private static String bundleVersionForFirebird(FirebirdSourceConfiguration config) {
+        return config.profile() == SourceProfile.SGH_FIREBIRD_25
+            ? BundleContract.FORMAT_VERSION_1_1
+            : BundleContract.FORMAT_VERSION;
+    }
+
     private static void handleAnalyze(String[] args) {
         var adapter = adapter(value(args, "--source"));
         System.out.println(adapter.analyze());
@@ -117,7 +125,8 @@ public final class MigrationCli {
         if ("firebird".equals(sourceId)) {
             var config = FirebirdSourceConfiguration.fromEnvironment();
             var adapter = new FirebirdSourceAdapter(config);
-            generateBundleStreaming(adapter, output, args);
+            var bundleVersion = bundleVersionForFirebird(config);
+            generateBundleStreaming(adapter, output, args, bundleVersion);
         } else {
             var adapter = adapter(sourceId);
             new CanonicalBundleWriter().write(adapter.readCanonical(), output);
@@ -129,10 +138,11 @@ public final class MigrationCli {
         var output = Path.of(value(args, "--output"));
         var config = FirebirdSourceConfiguration.fromEnvironment();
         var adapter = new FirebirdSourceAdapter(config);
-        generateBundleStreaming(adapter, output, args);
+        var bundleVersion = bundleVersionForFirebird(config);
+        generateBundleStreaming(adapter, output, args, bundleVersion);
     }
 
-    private static void generateBundleStreaming(FirebirdSourceAdapter adapter, Path output, String[] args) {
+    private static void generateBundleStreaming(FirebirdSourceAdapter adapter, Path output, String[] args, String bundleVersion) {
         var config = adapter.config();
         var checkpoints = new FirebirdCheckpointStore(config.workDirectory());
         if (hasFlag(args, "--resume") && !checkpoints.exists()) {
@@ -159,7 +169,7 @@ public final class MigrationCli {
             @Override public long processedCount(String phase) { return counts.getOrDefault(phase, new AtomicLong()).longValue(); }
         };
 
-        var recordHandler = new CanonicalBundleStreamingHandler(output, report, config.batchSize());
+        var recordHandler = new CanonicalBundleStreamingHandler(output, report, config.batchSize(), bundleVersion);
         try {
             adapter.extractTo(recordHandler, checkpoints, progress);
             recordHandler.finish();

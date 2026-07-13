@@ -8,10 +8,10 @@ public class UserLegacyMapper {
 
     public Map<String, Object> normalize(Map<String, Object> raw) {
         var result = new LinkedHashMap<String, Object>();
-        result.put("username", string(raw, "login"));
+        result.put("username", string(raw, "login", "codigo_usuario"));
         result.put("email", normalizeEmail(raw));
         result.put("displayName", string(raw, "nome"));
-        result.put("active", true);
+        result.put("active", active(raw));
         result.put("roleCodes", List.of(mapRole(raw)));
         return result;
     }
@@ -33,8 +33,22 @@ public class UserLegacyMapper {
         return email.strip().toLowerCase();
     }
 
-    private String string(Map<String, Object> raw, String key) {
-        var val = raw.get(key);
-        return val == null ? null : val.toString().strip();
+    private boolean active(Map<String, Object> raw) {
+        var excluido = string(raw, "excluido");
+        if (excluido == null) return true;
+        var s = excluido.toLowerCase();
+        if ("s".equals(s) || "sim".equals(s) || "true".equals(s)) return false;
+        if ("n".equals(s) || "nao".equals(s) || "false".equals(s)) return true;
+        return true;
+    }
+
+    private String string(Map<String, Object> raw, String... keys) {
+        for (var key : keys) {
+            var val = raw.get(key);
+            if (val == null) continue;
+            var str = val.toString().strip();
+            if (!str.isBlank()) return str;
+        }
+        return null;
     }
 }

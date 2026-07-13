@@ -2,8 +2,9 @@ package br.com.schf.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-
 import br.com.schf.migration.source.firebird.mapping.CategoryLegacyMapper;
+import br.com.schf.migration.source.firebird.mapping.CounterpartyResolver;
+import br.com.schf.migration.source.firebird.mapping.DateValidator;
 import br.com.schf.migration.source.firebird.mapping.FinancialAccountLegacyMapper;
 import br.com.schf.migration.source.firebird.mapping.PayableLegacyMapper;
 import br.com.schf.migration.source.firebird.mapping.PaymentLegacyMapper;
@@ -11,14 +12,18 @@ import br.com.schf.migration.source.firebird.mapping.SupplierLegacyMapper;
 import br.com.schf.migration.source.firebird.mapping.UserLegacyMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class PrivacyTest {
+
+    private static final LocalDate SNAPSHOT = LocalDate.of(2026, 7, 1);
+    private static final DateValidator DATE_VALIDATOR = new DateValidator(SNAPSHOT);
+    private static final CounterpartyResolver EMPTY_RESOLVER = new CounterpartyResolver(Map.of(), Map.of(), Map.of());
 
     private static final String SYNTHETIC_CPF = "111.222.333-44";
     private static final String SYNTHETIC_CNPJ = "99.888.777/0001-66";
@@ -103,22 +108,28 @@ class PrivacyTest {
     @Test
     void payableMappingDoesNotLeakPii() {
         var raw = new LinkedHashMap<String, Object>();
-        raw.put("historico", "Pagamento para " + SYNTHETIC_NAME);
+        raw.put("complemento_historico", "Pagamento para " + SYNTHETIC_NAME);
         raw.put("documento", "NF-PII-001");
         raw.put("valor", "1500,00");
         raw.put("emissao", "2026-01-15");
         raw.put("vencimento", "2026-02-15");
-        new PayableLegacyMapper().normalize(raw, "S-EXT", "C-EXT", "A-EXT");
+        raw.put("valorpago", "1500.00");
+        raw.put("datapagamento", "2026-02-10");
+        raw.put("codigo_tipo_conta", "3");
+        raw.put("codigo_conta", "1");
+        var mapper = new PayableLegacyMapper(DATE_VALIDATOR, EMPTY_RESOLVER, SNAPSHOT);
+        mapper.normalize(raw, "P-PII", "C-EXT", "A-EXT", "3");
         assertNoPiiInLogs();
     }
 
     @Test
     void paymentMappingDoesNotLeakPii() {
         var raw = new LinkedHashMap<String, Object>();
-        raw.put("datapag", "2026-02-10");
-        raw.put("valor", "1500,00");
-        raw.put("forma", "BOLETO");
-        new PaymentLegacyMapper().normalize(raw, "P-EXT");
+        raw.put("datapagamento", "2026-02-10");
+        raw.put("valorpago", "1500,00");
+        raw.put("forma_pr", "B");
+        var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
+        mapper.normalize(raw, "P-PII");
         assertNoPiiInLogs();
     }
 

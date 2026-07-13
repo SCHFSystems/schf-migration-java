@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
@@ -24,6 +25,8 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
     private final Path output;
     private final ExtractionReport report;
     private final int batchSize;
+    private final String bundleVersion;
+    private final List<String> dataFiles;
     private final Map<String, StringBuilder> buffers = new LinkedHashMap<>();
     private final Map<String, Long> counts = new LinkedHashMap<>();
     private final Map<String, String> checksums = new LinkedHashMap<>();
@@ -35,10 +38,16 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
     private boolean anonymized;
 
     public CanonicalBundleStreamingHandler(Path output, ExtractionReport report, int batchSize) {
+        this(output, report, batchSize, BundleContract.FORMAT_VERSION);
+    }
+
+    public CanonicalBundleStreamingHandler(Path output, ExtractionReport report, int batchSize, String bundleVersion) {
         this.output = output;
         this.report = report;
         this.batchSize = batchSize;
-        for (String name : BundleContract.DATA_FILES) {
+        this.bundleVersion = bundleVersion;
+        this.dataFiles = BundleContract.dataFilesForVersion(bundleVersion);
+        for (String name : dataFiles) {
             buffers.put(name, new StringBuilder());
             counts.put(name, 0L);
             try { digests.put(name, MessageDigest.getInstance("SHA-256")); } catch (Exception ex) {}
@@ -49,7 +58,7 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
     public void accept(String entityType, Map<String, Object> record) throws Exception {
         var fileName = entityType + ".ndjson";
         var buf = buffers.get(fileName);
-        if (buf == null) throw new IllegalArgumentException("Unknown entity type: " + entityType);
+        if (buf == null) throw new IllegalArgumentException("Unknown entity type: " + entityType + " (bundle version: " + bundleVersion + ")");
         var json = mapper.writeValueAsString(record);
         buf.append(json).append('\n');
         totalRecords++;
@@ -78,7 +87,7 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
     public void finish() throws Exception {
         Files.createDirectories(output.toAbsolutePath().normalize().getParent());
         try (var zip = new ZipOutputStream(Files.newOutputStream(output))) {
-            for (String name : BundleContract.DATA_FILES) {
+            for (String name : dataFiles) {
                 var buf = buffers.get(name);
                 if (buf == null) continue;
                 var bytes = buf.toString().getBytes(StandardCharsets.UTF_8);
@@ -90,14 +99,14 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
                 checksums.put(path, CanonicalBundleWriter.sha256(bytes));
                 report.record(name, counts.get(name), counts.get(name), 0, 0);
             }
-            for (String name : BundleContract.DATA_FILES) {
+            for (String name : dataFiles) {
                 var path = "bundle/data/" + name;
                 if (!checksums.containsKey(path)) {
                     checksums.put(path, CanonicalBundleWriter.sha256(new byte[0]));
                 }
             }
             var manifest = new BundleContract.Manifest(
-                BundleContract.FORMAT_VERSION, BundleContract.SCHEMA_VERSION,
+                bundleVersion, BundleContract.SCHEMA_VERSION,
                 sourceSystem != null ? sourceSystem : "unknown",
                 sourceInstanceId != null ? sourceInstanceId : UUID.randomUUID(),
                 OffsetDateTime.now(ZoneOffset.UTC), "schf-migration-java/0.1.0", "0.1.0",
@@ -112,7 +121,8 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
             zip.putNextEntry(new ZipEntry("bundle/checksums.sha256"));
             zip.write(checksumText.toString().getBytes(StandardCharsets.UTF_8));
             zip.closeEntry();
-            var summary = Map.of("recordCounts", counts, "anonymized", anonymized, "sourceSystem", sourceSystem);
+            var summary = Map.of("recordCounts", counts, "anonymized", anonymized, "sourceSystem", sourceSystem,
+                "bundleFormatVersion", bundleVersion);
             zip.putNextEntry(new ZipEntry("bundle/reports/migration-summary.json"));
             zip.write(mapper.writeValueAsBytes(summary));
             zip.closeEntry();
@@ -126,6 +136,7 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
         m.put("totalRecords", totalRecords);
         m.put("bundleSizeBytes", report.bundleSizeBytes());
         m.put("generatedAt", OffsetDateTime.now(ZoneOffset.UTC).toString());
+        m.put("bundleFormatVersion", bundleVersion);
         return m;
     }
 }

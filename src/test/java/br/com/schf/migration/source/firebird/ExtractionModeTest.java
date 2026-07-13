@@ -101,5 +101,48 @@ class ExtractionModeTest {
         assertThat(catalog.maxRows("suppliers")).isEqualTo(10);
     }
 
+    @Test
+    void counterpartyExternalIdIsDeterministic() {
+        var row = new LinkedHashMap<String, Object>();
+        row.put("codigo_tipo_conta", "7");
+        row.put("codigo_conta", "368");
+        var id = new SghFirebird25QueryCatalog(ExtractionMode.LIMITED_VALIDATION)
+            .buildExternalId("inst-1", "counterparties", row);
+        assertThat(id).isNotNull();
+        var id2 = new SghFirebird25QueryCatalog(ExtractionMode.LIMITED_VALIDATION)
+            .buildExternalId("inst-1", "counterparties", row);
+        assertThat(id).isEqualTo(id2);
+    }
 
+    @Test
+    void counterpartyExternalIdIsSameAcrossModes() {
+        var row = new LinkedHashMap<String, Object>();
+        row.put("codigo_tipo_conta", "15");
+        row.put("codigo_conta", "5");
+        var idLimited = new SghFirebird25QueryCatalog(ExtractionMode.LIMITED_VALIDATION)
+            .buildExternalId("inst-1", "counterparties", row);
+        var idFull = new SghFirebird25QueryCatalog(ExtractionMode.FULL_EXTRACTION)
+            .buildExternalId("inst-1", "counterparties", row);
+        assertThat(idLimited).isEqualTo(idFull);
+    }
+
+    @Test
+    void counterpartyQueryExists() {
+        var catalog = new SghFirebird25QueryCatalog(ExtractionMode.LIMITED_VALIDATION);
+        assertThat(catalog.query("counterparties")).contains("CODIGO_TIPO_CONTA IN (2, 7, 15)");
+        assertThat(catalog.query("counterparties-suppliers")).contains("FORNECEDOR");
+        assertThat(catalog.query("counterparties-colaboradores")).contains("COLABORADOR");
+    }
+
+    @Test
+    void counterpartiesUnlimitedInLimitedMode() {
+        var catalog = new SghFirebird25QueryCatalog(ExtractionMode.LIMITED_VALIDATION);
+        assertThat(catalog.maxRows("counterparties")).isZero();
+    }
+
+    @Test
+    void expectedSchemaNowIncludesColaboradorAndConta() {
+        var catalog = new SghFirebird25QueryCatalog();
+        assertThat(catalog.expectedSchemaTables()).contains("COLABORADOR", "CONTA");
+    }
 }

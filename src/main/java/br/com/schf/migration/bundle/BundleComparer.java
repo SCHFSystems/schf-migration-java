@@ -21,7 +21,11 @@ public class BundleComparer {
             var right = loadBundle(rightBundle);
             var result = new ComparisonResult();
 
-            for (String entityType : BundleContract.DATA_FILES) {
+            var allEntityTypes = new LinkedHashSet<String>();
+            allEntityTypes.addAll(left.keySet());
+            allEntityTypes.addAll(right.keySet());
+
+            for (String entityType : allEntityTypes) {
                 var leftRecords = recordsByExternalId(left, entityType);
                 var rightRecords = recordsByExternalId(right, entityType);
                 for (var entry : leftRecords.entrySet()) {
@@ -44,6 +48,8 @@ public class BundleComparer {
             throw new IllegalArgumentException("Failed to compare bundles", ex);
         }
     }
+
+    private static class LinkedHashSet<E> extends java.util.LinkedHashSet<E> {}
 
     private Map<String, List<Map<String, Object>>> loadBundle(Path bundle) throws Exception {
         var records = new LinkedHashMap<String, List<Map<String, Object>>>();

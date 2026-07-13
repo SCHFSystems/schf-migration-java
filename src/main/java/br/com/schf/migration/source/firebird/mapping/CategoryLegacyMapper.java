@@ -9,7 +9,7 @@ public class CategoryLegacyMapper {
         var result = new LinkedHashMap<String, Object>();
         result.put("name", string(raw, "descricao"));
         result.put("type", mapType(raw));
-        result.put("active", true);
+        result.put("active", active(raw));
         return result;
     }
 
@@ -22,8 +22,22 @@ public class CategoryLegacyMapper {
         return "EXPENSE";
     }
 
-    private String string(Map<String, Object> raw, String key) {
-        var val = raw.get(key);
-        return val == null ? null : val.toString().strip();
+    private boolean active(Map<String, Object> raw) {
+        var excluir = string(raw, "excluir");
+        if (excluir == null) return true;
+        var s = excluir.toLowerCase();
+        if ("s".equals(s) || "sim".equals(s) || "true".equals(s)) return false;
+        if ("n".equals(s) || "nao".equals(s) || "false".equals(s)) return true;
+        return true;
+    }
+
+    private String string(Map<String, Object> raw, String... keys) {
+        for (var key : keys) {
+            var val = raw.get(key);
+            if (val == null) continue;
+            var str = val.toString().strip();
+            if (!str.isBlank()) return str;
+        }
+        return null;
     }
 }

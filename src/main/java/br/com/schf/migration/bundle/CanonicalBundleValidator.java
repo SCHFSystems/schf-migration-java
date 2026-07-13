@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipInputStream;
 
@@ -16,11 +17,18 @@ public class CanonicalBundleValidator {
             while (entry != null) { files.put(entry.getName(), zip.readAllBytes()); entry = zip.getNextEntry(); }
             var mapper = new ObjectMapper();
             var manifest = mapper.readTree(files.get("bundle/manifest.json"));
-            if (!"1.0".equals(manifest.path("bundleFormatVersion").asText())) throw new IllegalArgumentException("Unsupported bundle version");
+            var version = manifest.path("bundleFormatVersion").asText();
+            if (!BundleContract.FORMAT_VERSION.equals(version) && !BundleContract.FORMAT_VERSION_1_1.equals(version)) {
+                throw new IllegalArgumentException("Unsupported bundle version: " + version);
+            }
+            var dataFiles = BundleContract.dataFilesForVersion(version);
             var checksums = parse(new String(files.get("bundle/checksums.sha256")));
-            for (String name : BundleContract.DATA_FILES) {
+            for (String name : dataFiles) {
                 var path = "bundle/data/" + name;
-                if (!CanonicalBundleWriter.sha256(files.get(path)).equals(checksums.get(path))) throw new IllegalArgumentException("Checksum mismatch");
+                var data = files.get(path);
+                if (data == null && BundleContract.FORMAT_VERSION.equals(version)) continue;
+                if (data == null) throw new IllegalArgumentException("Missing data file: " + path);
+                if (!CanonicalBundleWriter.sha256(data).equals(checksums.get(path))) throw new IllegalArgumentException("Checksum mismatch for " + path);
             }
         } catch (RuntimeException ex) { throw ex; }
         catch (Exception ex) { throw new IllegalArgumentException("Invalid canonical bundle", ex); }

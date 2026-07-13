@@ -12,33 +12,67 @@ Status derived from:
 ### Current SGH Database Reality
 PREVISTO_REALIZADO: ALL NULL (not used in this database)
 
-## Proposed Status Mapping for Java Adapter
+## Status Mapping for Java Adapter (Bundle Format 1.1)
+
+Status computed using snapshot date **2026-07-01** (fixed, not LocalDate.now()):
 
 ```java
-if (valorPago > 0 && dataPagamento != null) {
-    status = "paid";
-} else if (valorPago > 0) {
-    status = "paid_no_date";  // edge case: 0 records
-} else if (dataVencimento != null && isSaneYear(dataVencimento) 
-           && dataVencimento < today) {
-    status = "overdue";
+var hasPayment = valorPago != null && valorPago.compareTo(BigDecimal.ZERO) > 0;
+if (hasPayment && valorPago.compareTo(valor) > 0) {
+    status = PayableStatus.PAID_EXCESS;
+} else if (hasPayment && valorPago.compareTo(valor) < 0) {
+    status = PayableStatus.PARTIALLY_PAID;
+} else if (hasPayment) {
+    status = PayableStatus.PAID;
+} else if (dueDate != null && dueDate.isBefore(snapshotDate)) {
+    status = PayableStatus.OVERDUE;
 } else {
-    status = "open";
+    status = PayableStatus.OPEN;
 }
 ```
 
 ## Distribution (Filter D = 39,161)
 | Status | Count | % |
 |--------|-------|---|
-| paid | 38,460 | 98.21% |
-| overdue | 700 | 1.79% |
-| open | 1 | 0.003% |
+| PAID | 38,088 | 97.26% |
+| PARTIALLY_PAID | 373 | 0.95% |
+| PAID_EXCESS | 1,079 | 2.75% |
+| OVERDUE | 700 | 1.79% |
+| OPEN | 1 | 0.003% |
 
-## Partial / Overpaid Subset
-| Scenario | Count | Status | Treatment |
-|----------|-------|--------|-----------|
-| VALORPAGO >= VALOR (fully paid) | 38,088 | paid | Normal |
-| 0 < VALORPAGO < VALOR (partial) | 373 | paid_short | Same payment, reduced amount |
-| VALORPAGO > VALOR (overpaid) | 1,079 | paid_excess | Same payment, excess amount |
+## Partial / Overpaid Treatment
 
-All 38,460 paid records map to a single accumulated Payment per Payable.
+| Scenario | Count | Status | remainingAmount | overpaid |
+|----------|-------|--------|-----------------|----------|
+| VALORPAGO >= VALOR (fully paid) | 38,088 | PAID | 0.00 | false |
+| 0 < VALORPAGO < VALOR (partial) | 373 | PARTIALLY_PAID | VALOR - VALORPAGO | false |
+| VALORPAGO > VALOR (overpaid) | 1,079 | PAID_EXCESS | 0.00 | true |
+
+## Date Anomalies
+
+| Anomaly | Count | Treatment |
+|---------|-------|-----------|
+| Payment date before issue date | 405 | Keep dates, emit DATE_ORDER_INCONSISTENT warning |
+| Payment date but zero payment | 6 | Keep date, mark zeroAmount=true |
+| Bogus issue year (< 2000 or > 2026) | ~56 | Output null issueDate, emit INVALID_ISSUE_DATE warning |
+| Bogus due year (< 2000 or > 2026) | ~10 | Output null dueDate, emit INVALID_DUE_DATE warning |
+
+## Cardinality
+ONE_ACCUMULATED_PAYMENT_PER_PAYABLE (CONFIRMED)
+- 38,460 payables with VALORPAGO > 0
+- Each produces exactly 1 Payment record
+- Payment.externalId = Payable.externalId + "|PAYMENT"
+- Payment.amount = VALORPAGO
+- Payment.method = FORMA_PR mapped to PaymentMethod enum
+- Payment.date = DATA_PAGAMENTO (omitted if null)
+
+## Counterparty Resolution
+
+| CODIGO_TIPO_CONTA | Canonical Type | Source | Confidence |
+|-------------------|---------------|--------|------------|
+| 3 (FORNECEDOR) | SUPPLIER | FORNECEDOR table (FK) | CONFIRMED |
+| 2 (MEDICOS) | INTERNAL | CONTA table (type 2) | CONFIRMED |
+| 7 (FINANCEIRO) | GOVERNMENT/OTHER | CONTAS table (type 7) | CONFIRMED |
+| 15 (COLABORADOR) | EMPLOYEE | COLABORADOR table (FK) | CONFIRMED |
+
+All types resolved. No STOP condition triggered.
