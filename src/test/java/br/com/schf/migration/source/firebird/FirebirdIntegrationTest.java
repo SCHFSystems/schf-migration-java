@@ -46,7 +46,7 @@ class FirebirdIntegrationTest {
     static void setup() throws Exception {
         var host = FIREBIRD.getHost();
         var port = FIREBIRD.getMappedPort(FB_PORT);
-        var jdbcUrl = "jdbc:firebirdsql://" + host + ":" + port + "/SCHF_TEST";
+        var jdbcUrl = "jdbc:firebirdsql://" + host + ":" + port + "/var/lib/firebird/data/SCHF_TEST";
         config = new FirebirdSourceConfiguration(
             jdbcUrl, "sysdba", "masterkey",
             "firebird-sgh", INSTANCE_ID,
