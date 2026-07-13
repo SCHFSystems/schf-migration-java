@@ -36,6 +36,7 @@ class FirebirdIntegrationTest {
     @SuppressWarnings("resource")
     private static final GenericContainer<?> FIREBIRD = new GenericContainer<>("firebirdsql/firebird:5")
         .withEnv("FIREBIRD_DATABASE", "SCHF_TEST")
+        .withEnv("FIREBIRD_ROOT_PASSWORD", "masterkey")
         .withExposedPorts(FB_PORT);
 
     private static FirebirdSourceConfiguration config;
