@@ -123,6 +123,7 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
                 Map.entry("payables", "count-payables"),
                 Map.entry("users", "count-users"));
             for (var entry : counts) {
+                if (!catalog.hasQuery(entry.getValue())) continue;
                 try (var stmt = conn.createStatement();
                      var rs = stmt.executeQuery(catalog.query(entry.getValue()))) {
                     if (rs.next()) result.put(entry.getKey(), rs.getLong(1));
@@ -143,7 +144,8 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
     @Override
     public void extractTo(RecordHandler handler, CheckpointStore checkpoints, ProgressTracker progress) throws Exception {
         if (canonicalMapper == null) {
-            throw new IllegalStateException("SGH canonical mapper not initialized. Check source profile.");
+            extractSynthetic(handler, checkpoints, progress);
+            return;
         }
         try (var conn = connectionFactory.openReadOnly()) {
             extractPhaseCanonical(conn, handler, checkpoints, progress, "organizations", "organization", "count-organizations");
@@ -154,6 +156,74 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
             extractPhaseRaw(conn, handler, checkpoints, progress, "counterparties", "counterparties", "count-counterparties");
             extractPayablesAndPayments(conn, handler, checkpoints, progress);
         }
+    }
+
+    private void extractSynthetic(RecordHandler handler, CheckpointStore checkpoints, ProgressTracker progress) throws Exception {
+        try (var conn = connectionFactory.openReadOnly()) {
+            extractPhaseSynthetic(conn, handler, checkpoints, progress, "organizations", "organization", "count-organizations");
+            extractPhaseSynthetic(conn, handler, checkpoints, progress, "users", "users", "count-users");
+            extractPhaseSynthetic(conn, handler, checkpoints, progress, "suppliers", "suppliers", "count-suppliers");
+            extractPhaseSynthetic(conn, handler, checkpoints, progress, "categories", "categories", "count-categories");
+            extractPhaseSynthetic(conn, handler, checkpoints, progress, "financial-accounts", "financial-accounts", "count-accounts");
+            extractPayablesSynthetic(conn, handler, checkpoints, progress);
+        }
+    }
+
+    private void extractPhaseSynthetic(Connection conn, RecordHandler handler, CheckpointStore checkpoints,
+                                        ProgressTracker progress, String entityType, String queryKey, String countQueryKey) throws Exception {
+        if (!catalog.hasQuery(queryKey) || checkpoints.hasCompleted(entityType)) return;
+        progress.phaseStarted(entityType, estimateCount(conn, countQueryKey));
+        try (var stmt = conn.prepareStatement(catalog.query(queryKey))) {
+            stmt.setFetchSize(config.fetchSize());
+            var max = catalog.maxRows(entityType);
+            if (max > 0) stmt.setMaxRows(max);
+            try (var rs = stmt.executeQuery()) {
+                long count = 0;
+                while (rs.next()) {
+                    if (progress.isCancelled()) return;
+                    var raw = rowMapper.mapRow(rs);
+                    var externalId = catalog.buildExternalId(config.sourceInstanceId(), entityType, raw);
+                    var m = new LinkedHashMap<>(raw);
+                    m.put("externalId", externalId);
+                    handler.accept(entityType, m);
+                    count++;
+                    if (count % config.batchSize() == 0) {
+                        checkpoints.save(entityType, Map.of("lastCount", count));
+                        progress.recordsProcessed(entityType, count);
+                    }
+                }
+                progress.recordsProcessed(entityType, count);
+            }
+        }
+        checkpoints.markCompleted(entityType);
+        progress.phaseCompleted(entityType);
+    }
+
+    private void extractPayablesSynthetic(Connection conn, RecordHandler handler, CheckpointStore checkpoints,
+                                           ProgressTracker progress) throws Exception {
+        var entityType = "payables";
+        if (!catalog.hasQuery("payables") || checkpoints.hasCompleted(entityType)) return;
+        if (checkpoints.hasCompleted("payments")) return;
+        progress.phaseStarted(entityType, estimateCount(conn, "count-payables"));
+        try (var stmt = conn.prepareStatement(catalog.query("payables"))) {
+            stmt.setFetchSize(config.fetchSize());
+            try (var rs = stmt.executeQuery()) {
+                long count = 0;
+                while (rs.next()) {
+                    if (progress.isCancelled()) return;
+                    var raw = rowMapper.mapRow(rs);
+                    var externalId = catalog.buildExternalId(config.sourceInstanceId(), entityType, raw);
+                    var m = new LinkedHashMap<>(raw);
+                    m.put("externalId", externalId);
+                    handler.accept(entityType, m);
+                    count++;
+                }
+                progress.recordsProcessed(entityType, count);
+            }
+        }
+        checkpoints.markCompleted(entityType);
+        checkpoints.markCompleted("payments");
+        progress.phaseCompleted(entityType);
     }
 
     private void extractPayablesAndPayments(Connection conn, RecordHandler handler,
