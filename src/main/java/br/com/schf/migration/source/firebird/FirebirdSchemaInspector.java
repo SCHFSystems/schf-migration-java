@@ -8,24 +8,22 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class FirebirdSchemaInspector {
-    private final FirebirdQueryCatalog catalog;
-    private static final List<String> EXPECTED_TABLES = List.of(
-        "ORGANIZACAO", "FORNECEDOR", "CATEGORIA", "CONTA_BANCARIA",
-        "CONTA_PAGAR", "PAGAMENTO", "USUARIO");
+    private final QueryCatalog catalog;
 
-    public FirebirdSchemaInspector(FirebirdQueryCatalog catalog) {
+    public FirebirdSchemaInspector(QueryCatalog catalog) {
         this.catalog = catalog;
     }
 
     public Map<String, Object> inspect(Connection conn) throws Exception {
         var result = new LinkedHashMap<String, Object>();
         var tables = listTables(conn);
+        var expected = catalog.expectedSchemaTables();
         result.put("tableCount", tables.size());
-        result.put("expectedTablesPresent", EXPECTED_TABLES.stream().filter(tables::contains).toList());
-        result.put("expectedTablesMissing", EXPECTED_TABLES.stream().filter(t -> !tables.contains(t)).toList());
+        result.put("expectedTablesPresent", expected.stream().filter(tables::contains).toList());
+        result.put("expectedTablesMissing", expected.stream().filter(t -> !tables.contains(t)).toList());
         result.put("allTableNames", tables);
         var columns = new LinkedHashMap<String, List<Map<String, String>>>();
-        for (String table : EXPECTED_TABLES) {
+        for (String table : expected) {
             if (tables.contains(table)) {
                 columns.put(table, inspectColumns(conn, table));
             }

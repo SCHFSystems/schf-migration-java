@@ -11,7 +11,9 @@ public record FirebirdSourceConfiguration(
     int fetchSize,
     int batchSize,
     Path workDirectory,
-    Path reportDirectory
+    Path reportDirectory,
+    SourceProfile profile,
+    ExtractionMode extractionMode
 ) {
     public static FirebirdSourceConfiguration fromEnvironment() {
         var url = env("SCHF_FB_URL");
@@ -25,6 +27,20 @@ public record FirebirdSourceConfiguration(
         if (url == null || user == null || pass == null) {
             throw new IllegalStateException("Firebird credentials not configured. Set SCHF_FB_URL, SCHF_FB_USER, SCHF_FB_PASSWORD or use a local config file.");
         }
+        var profileName = envOrDefault("SCHF_SOURCE_PROFILE", "SYNTHETIC");
+        SourceProfile profile;
+        try {
+            profile = SourceProfile.valueOf(profileName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            profile = SourceProfile.SYNTHETIC;
+        }
+        var modeName = envOrDefault("SCHF_EXTRACTION_MODE", "LIMITED_VALIDATION");
+        ExtractionMode mode;
+        try {
+            mode = ExtractionMode.valueOf(modeName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            mode = ExtractionMode.LIMITED_VALIDATION;
+        }
         return new FirebirdSourceConfiguration(
             url, user, pass,
             envOrDefault("SCHF_SOURCE_ID", "firebird-sgh"),
@@ -34,7 +50,9 @@ public record FirebirdSourceConfiguration(
             Path.of(envOrDefault("SCHF_MIGRATION_WORK_DIRECTORY",
                 System.getProperty("java.io.tmpdir") + "/schf-migration-workbench")),
             Path.of(envOrDefault("SCHF_MIGRATION_REPORT_DIRECTORY",
-                System.getProperty("java.io.tmpdir") + "/schf-reports"))
+                System.getProperty("java.io.tmpdir") + "/schf-reports")),
+            profile,
+            mode
         );
     }
 

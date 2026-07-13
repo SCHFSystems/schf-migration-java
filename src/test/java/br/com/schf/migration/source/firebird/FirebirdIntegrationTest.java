@@ -53,7 +53,9 @@ class FirebirdIntegrationTest {
             "firebird-sgh", INSTANCE_ID,
             100, 10,
             Path.of(System.getProperty("java.io.tmpdir"), "schf-it-checkpoints"),
-            Path.of(System.getProperty("java.io.tmpdir"), "schf-it-reports")
+            Path.of(System.getProperty("java.io.tmpdir"), "schf-it-reports"),
+            SourceProfile.SYNTHETIC,
+            ExtractionMode.LIMITED_VALIDATION
         );
         adapter = new FirebirdSourceAdapter(config);
         initSchema(jdbcUrl);

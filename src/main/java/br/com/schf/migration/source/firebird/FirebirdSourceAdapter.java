@@ -10,21 +10,27 @@ import java.sql.Connection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 public class FirebirdSourceAdapter implements StreamingSourceAdapter {
     private final FirebirdConnectionFactory connectionFactory;
     private final FirebirdSchemaInspector schemaInspector;
-    private final FirebirdQueryCatalog catalog;
+    private final QueryCatalog catalog;
     private final FirebirdRowMapper rowMapper;
     private final FirebirdSourceConfiguration config;
 
     public FirebirdSourceAdapter(FirebirdSourceConfiguration config) {
         this.config = config;
         this.connectionFactory = new FirebirdConnectionFactory(config);
-        this.catalog = new FirebirdQueryCatalog();
+        this.catalog = createCatalog(config);
         this.schemaInspector = new FirebirdSchemaInspector(catalog);
         this.rowMapper = new FirebirdRowMapper();
+    }
+
+    private static QueryCatalog createCatalog(FirebirdSourceConfiguration config) {
+        return switch (config.profile()) {
+            case SGH_FIREBIRD_25 -> new SghFirebird25QueryCatalog(config.extractionMode());
+            case SYNTHETIC -> new FirebirdQueryCatalog();
+        };
     }
 
     @Override
@@ -70,7 +76,7 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
             extractPhase(conn, handler, checkpoints, progress, "categories", "categories", "count-categories");
             extractPhase(conn, handler, checkpoints, progress, "financial-accounts", "financial-accounts", "count-accounts");
             extractPhase(conn, handler, checkpoints, progress, "payables", "payables", "count-payables");
-            extractPhase(conn, handler, checkpoints, progress, "payments", "payments", "count-payables");
+            extractPhase(conn, handler, checkpoints, progress, "payments", "payments", "count-payments");
         }
     }
 
@@ -82,12 +88,14 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
         progress.phaseStarted(entityType, estimateCount(conn, countQueryKey));
         try (var stmt = conn.prepareStatement(catalog.query(queryKey))) {
             stmt.setFetchSize(config.fetchSize());
+            var max = catalog.maxRows(entityType);
+            if (max > 0) stmt.setMaxRows(max);
             try (var rs = stmt.executeQuery()) {
                 long count = 0;
                 while (rs.next()) {
                     if (progress.isCancelled()) return;
                     var row = rowMapper.mapRow(rs);
-                    var externalId = buildExternalId(entityType, row);
+                    var externalId = catalog.buildExternalId(config.sourceInstanceId(), entityType, row);
                     row.put("externalId", externalId);
                     handler.accept(entityType, row);
                     count++;
@@ -110,22 +118,6 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
         } catch (Exception ex) {
             return -1;
         }
-    }
-
-    private String buildExternalId(String entityType, Map<String, Object> row) {
-        var sourceId = config.sourceInstanceId();
-        var idColumn = switch (entityType) {
-            case "suppliers" -> "codfor";
-            case "categories" -> "codcat";
-            case "financial-accounts" -> "codctg";
-            case "payables" -> "coddcto";
-            case "payments" -> "codpag";
-            case "users" -> "codusu";
-            case "organizations" -> "codorg";
-            default -> "id";
-        };
-        var pk = row.getOrDefault(idColumn, "unknown").toString();
-        return UUID.nameUUIDFromBytes((sourceId + "|" + entityType + "|" + pk).getBytes()).toString();
     }
 
     public FirebirdSourceConfiguration config() { return config; }

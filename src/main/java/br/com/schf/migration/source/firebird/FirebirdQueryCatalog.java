@@ -2,8 +2,9 @@ package br.com.schf.migration.source.firebird;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
-public class FirebirdQueryCatalog {
+public class FirebirdQueryCatalog implements QueryCatalog {
     private final Map<String, String> queries = new LinkedHashMap<>();
 
     public FirebirdQueryCatalog() {
@@ -39,5 +40,25 @@ public class FirebirdQueryCatalog {
 
     public Map<String, String> allQueries() {
         return Map.copyOf(queries);
+    }
+
+    @Override
+    public Set<String> expectedSchemaTables() {
+        return Set.of("ORGANIZACAO", "FORNECEDOR", "CATEGORIA", "CONTA_BANCARIA",
+            "CONTA_PAGAR", "PAGAMENTO", "USUARIO");
+    }
+
+    @Override
+    public String idColumn(String entityType) {
+        return switch (entityType) {
+            case "suppliers" -> "codfor";
+            case "categories" -> "codcat";
+            case "financial-accounts" -> "codctg";
+            case "payables" -> "coddcto";
+            case "payments" -> "codpag";
+            case "users" -> "codusu";
+            case "organizations" -> "codorg";
+            default -> "id";
+        };
     }
 }
