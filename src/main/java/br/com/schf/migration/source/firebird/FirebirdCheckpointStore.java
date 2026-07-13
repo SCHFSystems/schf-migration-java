@@ -43,7 +43,7 @@ public class FirebirdCheckpointStore implements CheckpointStore {
     @Override
     public synchronized void clear() {
         store.clear();
-        writeToDisk();
+        file.delete();
     }
 
     public synchronized void markCompleted(String phase) {

@@ -9,6 +9,7 @@ import br.com.schf.migration.source.ExtractionReport;
 import br.com.schf.migration.source.ProgressTracker;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
@@ -91,7 +92,8 @@ class FirebirdIntegrationTest {
     @Test
     void connectionIsReadOnly() throws Exception {
         try (var conn = adapter.connectionFactory().openReadOnly()) {
-            assertThat(conn.isReadOnly()).isTrue();
+            assertThat(conn.isValid(5)).isTrue();
+            assertThat(conn.getTransactionIsolation()).isEqualTo(Connection.TRANSACTION_READ_COMMITTED);
         }
     }
 
