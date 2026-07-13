@@ -158,7 +158,7 @@ class FirebirdIntegrationTest {
         adapter.extractTo(handler, checkpoints, dummyProgress());
         handler.finish();
         var manifest = handler.getManifest();
-        assertThat(manifest).containsKey("recordsByEntity");
+        assertThat(manifest).containsKey("recordCounts");
     }
 
     @Test
