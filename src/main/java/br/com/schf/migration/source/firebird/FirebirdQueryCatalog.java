@@ -10,7 +10,7 @@ public class FirebirdQueryCatalog {
         queries.put("inspect-tables", "SELECT RDB$RELATION_NAME FROM RDB$RELATIONS WHERE RDB$SYSTEM_FLAG = 0 AND RDB$RELATION_TYPE = 0 ORDER BY RDB$RELATION_NAME");
         queries.put("inspect-columns", "SELECT rf.RDB$FIELD_NAME, f.RDB$FIELD_TYPE, f.RDB$FIELD_SUB_TYPE, f.RDB$FIELD_LENGTH FROM RDB$RELATION_FIELDS rf JOIN RDB$FIELDS f ON rf.RDB$FIELD_SOURCE = f.RDB$FIELD_NAME WHERE rf.RDB$RELATION_NAME = ? ORDER BY rf.RDB$FIELD_POSITION");
         queries.put("source-instance", "SELECT FIRST 1 MON$DATABASE_NAME FROM MON$DATABASE");
-        queries.put("organization", "SELECT FIRST 1 MON$DATABASE_NAME FROM MON$DATABASE");
+        queries.put("organization", "SELECT FIRST 1 MON$DATABASE_NAME AS code FROM MON$DATABASE");
         queries.put("count-organizations", "SELECT COUNT(*) FROM ORGANIZACAO");
         queries.put("count-suppliers", "SELECT COUNT(*) FROM FORNECEDOR");
         queries.put("count-categories", "SELECT COUNT(*) FROM CATEGORIA");
