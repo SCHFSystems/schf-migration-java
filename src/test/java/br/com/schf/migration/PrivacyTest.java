@@ -23,7 +23,7 @@ class PrivacyTest {
 
     private static final LocalDate SNAPSHOT = LocalDate.of(2026, 7, 1);
     private static final DateValidator DATE_VALIDATOR = new DateValidator(SNAPSHOT);
-    private static final CounterpartyResolver EMPTY_RESOLVER = new CounterpartyResolver(Map.of(), Map.of(), Map.of());
+    private static final CounterpartyResolver EMPTY_RESOLVER = new CounterpartyResolver(Map.of());
 
     private static final String SYNTHETIC_CPF = "111.222.333-44";
     private static final String SYNTHETIC_CNPJ = "99.888.777/0001-66";
@@ -129,7 +129,7 @@ class PrivacyTest {
         raw.put("valorpago", "1500,00");
         raw.put("forma_pr", "B");
         var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
-        mapper.normalize(raw, "P-PII");
+        mapper.normalize(raw, "P-PII", "PMT-PII");
         assertNoPiiInLogs();
     }
 

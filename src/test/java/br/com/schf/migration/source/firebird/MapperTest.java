@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class MapperTest {
     private static final LocalDate SNAPSHOT = LocalDate.of(2026, 7, 1);
     private static final DateValidator DATE_VALIDATOR = new DateValidator(SNAPSHOT);
-    private static final CounterpartyResolver EMPTY_RESOLVER = new CounterpartyResolver(Map.of(), Map.of(), Map.of());
+    private static final CounterpartyResolver EMPTY_RESOLVER = new CounterpartyResolver(Map.of());
 
     @Test
     void supplierNormalizesDocument() {
@@ -260,7 +260,8 @@ class MapperTest {
         raw.put("valorpago", "1500,50");
         raw.put("forma_pr", "B");
         var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
-        var result = mapper.normalize(raw, "P-EXT");
+        var result = mapper.normalize(raw, "P-EXT", "PMT-EXT");
+        assertThat(result.canonical().get("externalId")).isEqualTo("PMT-EXT");
         assertThat(result.canonical().get("payableExternalId")).isEqualTo("P-EXT");
         assertThat(result.canonical().get("paymentDate")).isEqualTo("2026-02-10");
         assertThat(result.canonical().get("amount")).isEqualTo("1500.50");
@@ -273,7 +274,7 @@ class MapperTest {
         raw.put("valorpago", "100.00");
         raw.put("forma_pr", "C");
         var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
-        var result = mapper.normalize(raw, "P-CASH");
+        var result = mapper.normalize(raw, "P-CASH", "PMT-CASH");
         assertThat(result.canonical().get("method")).isEqualTo("CASH");
     }
 
@@ -283,7 +284,7 @@ class MapperTest {
         raw.put("valorpago", "100.00");
         raw.put("forma_pr", "X");
         var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
-        var result = mapper.normalize(raw, "P-OTHER");
+        var result = mapper.normalize(raw, "P-OTHER", "PMT-OTHER");
         assertThat(result.canonical().get("method")).isEqualTo("OTHER");
     }
 
@@ -293,7 +294,7 @@ class MapperTest {
         raw.put("valorpago", "100.00");
         raw.put("forma_pr", "B");
         var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
-        var result = mapper.normalize(raw, "P-NODATE");
+        var result = mapper.normalize(raw, "P-NODATE", "PMT-NODATE");
         assertThat(result.canonical()).doesNotContainKey("paymentDate");
     }
 
@@ -303,7 +304,7 @@ class MapperTest {
         raw.put("valorpago", "0.00");
         raw.put("forma_pr", "B");
         var mapper = new PaymentLegacyMapper(DATE_VALIDATOR);
-        var result = mapper.normalize(raw, "P-ZERO");
+        var result = mapper.normalize(raw, "P-ZERO", "PMT-ZERO");
         assertThat(result.canonical().get("zeroAmount")).isEqualTo(true);
     }
 
@@ -317,7 +318,7 @@ class MapperTest {
         assertThat(result.get("username")).isEqualTo("joao");
         assertThat(result.get("displayName")).isEqualTo("Joao Silva");
         assertThat(result.get("roleCodes")).asList().contains("ADMIN");
-        assertThat(result.get("email")).isNull();
+        assertThat(result.get("email")).isEqualTo("imported+ed2befb1@invalid.local");
     }
 
     @Test

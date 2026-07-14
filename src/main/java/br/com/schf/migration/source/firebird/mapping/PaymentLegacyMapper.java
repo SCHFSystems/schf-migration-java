@@ -15,7 +15,7 @@ public class PaymentLegacyMapper {
         this.dateValidator = dateValidator;
     }
 
-    public PaymentMappingResult normalize(Map<String, Object> raw, String payableExternalId) {
+    public PaymentMappingResult normalize(Map<String, Object> raw, String payableExternalId, String paymentExternalId) {
         var warnings = new ArrayList<DateWarning>();
 
         var paymentRaw = string(raw, "datapagamento", "datapag");
@@ -26,6 +26,7 @@ public class PaymentLegacyMapper {
         warnings.addAll(dateResult.warnings());
 
         var result = new LinkedHashMap<String, Object>();
+        result.put("externalId", paymentExternalId);
         result.put("payableExternalId", payableExternalId);
         result.put("amount", amount);
         result.put("method", method.name());

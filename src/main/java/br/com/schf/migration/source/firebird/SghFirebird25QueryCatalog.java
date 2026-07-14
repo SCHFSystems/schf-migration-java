@@ -37,7 +37,13 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         queries.put("count-users",
             "SELECT COUNT(*) FROM USUARIO WHERE EXCLUIDO IS NULL OR EXCLUIDO <> 'S'");
         queries.put("count-counterparties",
-            "SELECT COUNT(*) FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S')");
+            "SELECT COUNT(*) FROM ("
+            + " SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 7, 15)"
+            + " UNION"
+            + " SELECT '3', CODIGO FROM FORNECEDOR"
+            + " UNION"
+            + " SELECT CODIGO_TIPO_CONTA, CODIGO FROM COLABORADOR WHERE (DESATIVADO IS NULL OR DESATIVADO <> 'S')"
+            + ") src");
         queries.put("suppliers",
             "SELECT * FROM FORNECEDOR ORDER BY CODIGO");
         queries.put("categories",
@@ -45,13 +51,19 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         queries.put("financial-accounts",
             "SELECT * FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6 AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') ORDER BY CODIGO_CONTA");
         queries.put("counterparties",
-            "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 7, 15) ORDER BY CODIGO_TIPO_CONTA, CODIGO_CONTA");
+            "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM ("
+            + "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 7, 15) "
+            + "UNION "
+            + "SELECT '3' AS CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME FROM FORNECEDOR "
+            + "UNION "
+            + "SELECT CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME FROM COLABORADOR WHERE (DESATIVADO IS NULL OR DESATIVADO <> 'S')"
+            + ") src ORDER BY CODIGO_TIPO_CONTA, CODIGO_CONTA");
         queries.put("counterparties-suppliers",
             "SELECT CODIGO AS CODIGO_CONTA, NOME, '3' AS CODIGO_TIPO_CONTA FROM FORNECEDOR");
         queries.put("counterparties-colaboradores",
             "SELECT CODIGO AS CODIGO_CONTA, NOME, CODIGO_TIPO_CONTA FROM COLABORADOR WHERE (DESATIVADO IS NULL OR DESATIVADO <> 'S')");
         queries.put("payables",
-            "SELECT * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0 ORDER BY DATA_VENCIMENTO");
+            "SELECT * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0 ORDER BY DATA_VENCIMENTO, CODIGO_TIPO_CONTA, CODIGO_CONTA, DOC_RCB_PGT");
         queries.put("payments", buildPaymentsQuery());
         queries.put("users",
             "SELECT * FROM USUARIO WHERE EXCLUIDO IS NULL OR EXCLUIDO <> 'S' ORDER BY CODIGO_USUARIO");
@@ -59,19 +71,20 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
 
     private String buildPaymentsQuery() {
         if (mode.isLimited()) {
-            return "SELECT * FROM (SELECT FIRST 3 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='B' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO<VALOR ORDER BY DATA_PAGAMENTO) t1"
+            var sort = " ORDER BY DATA_PAGAMENTO, CODIGO_TIPO_CONTA, CODIGO_CONTA, DOC_RCB_PGT";
+            return "SELECT * FROM (SELECT FIRST 3 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='B' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO<VALOR" + sort + ") t1"
                 + " UNION ALL"
-                + " SELECT * FROM (SELECT FIRST 1 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='B' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO>VALOR ORDER BY DATA_PAGAMENTO) t2"
+                + " SELECT * FROM (SELECT FIRST 1 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='B' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO>VALOR" + sort + ") t2"
                 + " UNION ALL"
-                + " SELECT * FROM (SELECT FIRST 1 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='B' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO=VALOR ORDER BY DATA_PAGAMENTO) t3"
+                + " SELECT * FROM (SELECT FIRST 1 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='B' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO=VALOR" + sort + ") t3"
                 + " UNION ALL"
-                + " SELECT * FROM (SELECT FIRST 2 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='C' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') ORDER BY DATA_PAGAMENTO) t4"
+                + " SELECT * FROM (SELECT FIRST 2 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND FORMA_PR='C' AND (EXCLUIR IS NULL OR EXCLUIR<>'S')" + sort + ") t4"
                 + " UNION ALL"
-                + " SELECT * FROM (SELECT FIRST 2 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND (FORMA_PR IS NULL OR FORMA_PR='') AND (EXCLUIR IS NULL OR EXCLUIR<>'S') ORDER BY DATA_PAGAMENTO) t5"
+                + " SELECT * FROM (SELECT FIRST 2 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND (FORMA_PR IS NULL OR FORMA_PR='') AND (EXCLUIR IS NULL OR EXCLUIR<>'S')" + sort + ") t5"
                 + " UNION ALL"
-                + " SELECT * FROM (SELECT FIRST 1 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND EXCLUIR='S' ORDER BY DATA_PAGAMENTO) t6";
+                + " SELECT * FROM (SELECT FIRST 1 * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND VALORPAGO>0 AND EXCLUIR='S'" + sort + ") t6";
         }
-        return "SELECT * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO>0 ORDER BY DATA_PAGAMENTO";
+        return "SELECT * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT='P' AND (EXCLUIR IS NULL OR EXCLUIR<>'S') AND VALORPAGO>0 ORDER BY DATA_PAGAMENTO, CODIGO_TIPO_CONTA, CODIGO_CONTA, DOC_RCB_PGT";
     }
 
     public boolean hasQuery(String key) {
@@ -136,6 +149,10 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         if ("counterparties".equals(entityType)) {
             var tipoConta = row.getOrDefault("codigo_tipo_conta", "?").toString();
             var codConta = row.getOrDefault("codigo_conta", "?").toString();
+            if ("3".equals(tipoConta)) {
+                var key = sourceInstanceId + "|suppliers|" + codConta;
+                return UUID.nameUUIDFromBytes(key.getBytes()).toString();
+            }
             var key = sourceInstanceId + "|CONTAS|" + tipoConta + "|" + codConta;
             return UUID.nameUUIDFromBytes(key.getBytes()).toString();
         }

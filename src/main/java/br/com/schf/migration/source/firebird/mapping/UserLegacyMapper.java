@@ -1,5 +1,8 @@
 package br.com.schf.migration.source.firebird.mapping;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +32,17 @@ public class UserLegacyMapper {
     private String normalizeEmail(Map<String, Object> raw) {
         var email = string(raw, "email");
         if (email == null) email = string(raw, "email_alternativo");
-        if (email == null) return null;
-        return email.strip().toLowerCase();
+        if (email != null) return email.strip().toLowerCase();
+        var username = string(raw, "login", "codigo_usuario");
+        if (username == null) return "imported+" + "unknown" + "@invalid.local";
+        try {
+            var hash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest(username.getBytes(StandardCharsets.UTF_8)))
+                .substring(0, 8);
+            return "imported+" + hash + "@invalid.local";
+        } catch (Exception e) {
+            return "imported+" + username.hashCode() + "@invalid.local";
+        }
     }
 
     private boolean active(Map<String, Object> raw) {

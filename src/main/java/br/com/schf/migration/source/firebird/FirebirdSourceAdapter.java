@@ -45,52 +45,17 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
     private CanonicalRecordMapper createCanonicalMapper(FirebirdSourceConfiguration config) {
         if (!config.profile().isSgh()) return null;
         try (var conn = connectionFactory.openReadOnly()) {
-            var supplierInfos = loadSupplierInfos(conn);
-            var contasInfos = loadContasInfos(conn);
-            var colaboradorInfos = loadColaboradorInfos(conn);
-            var resolver = new CounterpartyResolver(supplierInfos, contasInfos, colaboradorInfos);
+            var allInfos = loadAllCounterpartyInfos(conn);
+            var resolver = new CounterpartyResolver(allInfos);
             return new CanonicalRecordMapper(SNAPSHOT_DATE, resolver);
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to initialize canonical mapper: " + ex.getMessage(), ex);
         }
     }
 
-    private Map<String, CounterpartyInfo> loadSupplierInfos(Connection conn) throws Exception {
-        var map = new LinkedHashMap<String, CounterpartyInfo>();
-        try (var stmt = conn.prepareStatement(catalog.query("counterparties-suppliers"));
-             var rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                var codigo = rs.getString("codigo_conta").strip();
-                var nome = rs.getString("nome");
-                map.put(codigo, new CounterpartyInfo(
-                    catalog.buildExternalId(config.sourceInstanceId(), "counterparties",
-                        Map.of("codigo_tipo_conta", "3", "codigo_conta", codigo)),
-                    nome != null ? nome.strip() : null));
-            }
-        }
-        return map;
-    }
-
-    private Map<String, CounterpartyInfo> loadContasInfos(Connection conn) throws Exception {
+    private Map<String, CounterpartyInfo> loadAllCounterpartyInfos(Connection conn) throws Exception {
         var map = new LinkedHashMap<String, CounterpartyInfo>();
         try (var stmt = conn.prepareStatement(catalog.query("counterparties"));
-             var rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                var tipo = rs.getString("codigo_tipo_conta").strip();
-                var codigo = rs.getString("codigo_conta").strip();
-                var nome = rs.getString("nome");
-                map.put(tipo + "|" + codigo, new CounterpartyInfo(
-                    catalog.buildExternalId(config.sourceInstanceId(), "counterparties",
-                        Map.of("codigo_tipo_conta", tipo, "codigo_conta", codigo)),
-                    nome != null ? nome.strip() : null));
-            }
-        }
-        return map;
-    }
-
-    private Map<String, CounterpartyInfo> loadColaboradorInfos(Connection conn) throws Exception {
-        var map = new LinkedHashMap<String, CounterpartyInfo>();
-        try (var stmt = conn.prepareStatement(catalog.query("counterparties-colaboradores"));
              var rs = stmt.executeQuery()) {
             while (rs.next()) {
                 var tipo = rs.getString("codigo_tipo_conta").strip();
@@ -233,17 +198,6 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
         var estimatedCount = estimateCount(conn, "count-payables");
         progress.phaseStarted("payables", estimatedCount);
 
-        // Pre-load supplier IDs for lookup
-        var supplierExtIds = new LinkedHashMap<String, String>();
-        try (var stmt = conn.prepareStatement("SELECT CODIGO FROM FORNECEDOR");
-             var rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                var codigo = rs.getString(1).strip();
-                supplierExtIds.put(codigo, catalog.buildExternalId(config.sourceInstanceId(), "suppliers",
-                    Map.of("codigo", codigo)));
-            }
-        }
-
         var categoryExtIds = new LinkedHashMap<String, String>();
         try (var stmt = conn.prepareStatement("SELECT ID_CLASSIFICACAO_FINANCEIRA FROM SFN_CLASSIFICACAO_FINANCEIRA");
              var rs = stmt.executeQuery()) {
@@ -281,13 +235,11 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
                     var raw = rowMapper.mapRow(rs);
                     var externalId = catalog.buildExternalId(config.sourceInstanceId(), "payables", raw);
 
-                    // Resolve supplier/category/account external IDs
-                    var codigoFornecedor = string(raw, "codigo_conta");
+                    // Resolve category/account external IDs
                     var codigoCat = string(raw, "id_classificacao_financeira");
                     if (codigoCat == null) codigoCat = string(raw, "codigo_classificacao");
                     var codigoConta = string(raw, "numero_operacao");
 
-                    var sExt = supplierExtIds.get(codigoFornecedor);
                     var cExt = codigoCat != null ? categoryExtIds.get(codigoCat) : null;
                     var aExt = codigoConta != null ? accountExtIds.get(codigoConta) : null;
 
@@ -298,9 +250,8 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
                     // Create payment record if paid
                     var valorPagoStr = normalizeMoney(raw, "valorpago");
                     if (valorPagoStr != null && !"0.00".equals(valorPagoStr)) {
-                        var paymentExtId = externalId + "|PAYMENT";
-                        raw.put("paymentExternalId", paymentExtId);
-                        var paymentResult = canonicalMapper.mapPayment(raw, externalId);
+                        var paymentExternalId = catalog.buildExternalId(config.sourceInstanceId(), "payments", raw);
+                        var paymentResult = canonicalMapper.mapPayment(raw, externalId, paymentExternalId);
                         handler.accept("payments", paymentResult.canonical());
                     }
 
@@ -362,16 +313,18 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
                 while (rs.next()) {
                     if (progress.isCancelled()) return;
                     var raw = rowMapper.mapRow(rs);
-                    var externalId = catalog.buildExternalId(config.sourceInstanceId(), entityType, raw);
-
                     var tipoConta = string(raw, "codigo_tipo_conta");
-                    var codConta = string(raw, "codigo_conta");
-                    var nome = string(raw, "nome");
-                    var resolved = canonicalMapper.counterpartyResolver().resolve(
-                        tipoConta != null ? Integer.parseInt(tipoConta) : 0, codConta);
 
-                    var canonical = canonicalMapper.mapCounterparty(externalId, resolved);
-                    handler.accept(entityType, canonical);
+                    // FORNECEDOR (tipo=3) is already extracted as suppliers with same externalId
+                    if (!"3".equals(tipoConta)) {
+                        var externalId = catalog.buildExternalId(config.sourceInstanceId(), entityType, raw);
+                        var codConta = string(raw, "codigo_conta");
+                        var nome = string(raw, "nome");
+                        var resolved = canonicalMapper.counterpartyResolver().resolve(
+                            tipoConta != null ? Integer.parseInt(tipoConta) : 0, codConta);
+                        var canonical = canonicalMapper.mapCounterparty(externalId, resolved);
+                        handler.accept(entityType, canonical);
+                    }
                     processed++;
                 }
                 checkpoints.markCompleted(entityType);

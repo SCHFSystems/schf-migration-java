@@ -67,8 +67,9 @@ public class CanonicalRecordMapper {
         return payableMapper.normalize(raw, externalId, categoryExternalId, financialAccountExternalId, codigoTipoConta);
     }
 
-    public PaymentLegacyMapper.PaymentMappingResult mapPayment(Map<String, Object> raw, String payableExternalId) {
-        return paymentMapper.normalize(raw, payableExternalId);
+    public PaymentLegacyMapper.PaymentMappingResult mapPayment(Map<String, Object> raw, String payableExternalId,
+                                                               String paymentExternalId) {
+        return paymentMapper.normalize(raw, payableExternalId, paymentExternalId);
     }
 
     public Map<String, Object> mapCounterparty(String externalId, ResolvedCounterparty resolved) {
