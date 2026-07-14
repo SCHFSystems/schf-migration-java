@@ -49,7 +49,7 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         queries.put("counterparties-suppliers",
             "SELECT CODIGO AS CODIGO_CONTA, NOME, '3' AS CODIGO_TIPO_CONTA FROM FORNECEDOR");
         queries.put("counterparties-colaboradores",
-            "SELECT CODIGO AS CODIGO_CONTA, NOME, CODIGO_TIPO_CONTA FROM COLABORADOR WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S')");
+            "SELECT CODIGO AS CODIGO_CONTA, NOME, CODIGO_TIPO_CONTA FROM COLABORADOR WHERE (DESATIVADO IS NULL OR DESATIVADO <> 'S')");
         queries.put("payables",
             "SELECT * FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0 ORDER BY DATA_VENCIMENTO");
         queries.put("payments", buildPaymentsQuery());
