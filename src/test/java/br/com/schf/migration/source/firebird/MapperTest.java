@@ -253,6 +253,139 @@ class MapperTest {
         assertThat(result.warnings()).anyMatch(w -> w.code().name().equals("DATE_ORDER_INCONSISTENT"));
     }
 
+    // --- CounterpartyResolver tests ---
+
+    @Test
+    void resolverFindsCounterpartyByKey() {
+        var infos = Map.of("4|100", new CounterpartyResolver.CounterpartyInfo("EXT-100", "Type4 Name"));
+        var resolver = new CounterpartyResolver(infos);
+        var result = resolver.resolve(4, "100");
+        assertThat(result.externalId()).isEqualTo("EXT-100");
+        assertThat(result.name()).isEqualTo("Type4 Name");
+        assertThat(result.type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverReturnsNullForMissingKey() {
+        var resolver = new CounterpartyResolver(Map.of());
+        var result = resolver.resolve(4, "999");
+        assertThat(result.externalId()).isNull();
+        assertThat(result.name()).isNull();
+    }
+
+    @Test
+    void resolverMapsType4ToInternal() {
+        var infos = Map.of("4|1", new CounterpartyResolver.CounterpartyInfo("E4", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(4, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType5ToInternal() {
+        var infos = Map.of("5|1", new CounterpartyResolver.CounterpartyInfo("E5", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(5, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType9ToInternal() {
+        var infos = Map.of("9|1", new CounterpartyResolver.CounterpartyInfo("E9", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(9, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType10ToInternal() {
+        var infos = Map.of("10|1", new CounterpartyResolver.CounterpartyInfo("E10", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(10, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType11ToInternal() {
+        var infos = Map.of("11|1", new CounterpartyResolver.CounterpartyInfo("E11", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(11, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType12ToInternal() {
+        var infos = Map.of("12|1", new CounterpartyResolver.CounterpartyInfo("E12", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(12, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType13ToInternal() {
+        var infos = Map.of("13|1", new CounterpartyResolver.CounterpartyInfo("E13", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(13, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType14ToInternal() {
+        var infos = Map.of("14|1", new CounterpartyResolver.CounterpartyInfo("E14", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(14, "1").type().name()).isEqualTo("INTERNAL");
+    }
+
+    @Test
+    void resolverMapsType7ToGovernment() {
+        var infos = Map.of("7|1", new CounterpartyResolver.CounterpartyInfo("E7", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(7, "1").type().name()).isEqualTo("GOVERNMENT");
+    }
+
+    @Test
+    void resolverMapsType3ToSupplier() {
+        var infos = Map.of("3|1", new CounterpartyResolver.CounterpartyInfo("E3", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(3, "1").type().name()).isEqualTo("SUPPLIER");
+    }
+
+    @Test
+    void resolverMapsType1And15ToEmployee() {
+        var infos = Map.of("1|1", new CounterpartyResolver.CounterpartyInfo("E1", null),
+            "15|1", new CounterpartyResolver.CounterpartyInfo("E15", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(1, "1").type().name()).isEqualTo("EMPLOYEE");
+        assertThat(resolver.resolve(15, "1").type().name()).isEqualTo("EMPLOYEE");
+    }
+
+    @Test
+    void resolverMapsUnknownTypeToOther() {
+        var infos = Map.of("99|1", new CounterpartyResolver.CounterpartyInfo("E99", null));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(99, "1").type().name()).isEqualTo("OTHER");
+    }
+
+    @Test
+    void resolverTrimsWhitespace() {
+        var infos = Map.of("4|100", new CounterpartyResolver.CounterpartyInfo("EXT", "  Name  "));
+        var resolver = new CounterpartyResolver(infos);
+        assertThat(resolver.resolve(4, " 100 ").name()).isEqualTo("  Name  "); // name not trimmed by resolver
+    }
+
+    @Test
+    void payableWithInternalCounterpartyType4SetsCounterpartyExternalId() {
+        var infos = Map.of("4|100", new CounterpartyResolver.CounterpartyInfo("CP-4-100", "Type4 Name"));
+        var resolver = new CounterpartyResolver(infos);
+        var mapper = new PayableLegacyMapper(DATE_VALIDATOR, resolver, SNAPSHOT);
+        var raw = new LinkedHashMap<String, Object>();
+        raw.put("complemento_historico", "Type 4 payable");
+        raw.put("documento", "NF-T4");
+        raw.put("valor", "1000.00");
+        raw.put("emissao", "2026-06-01");
+        raw.put("vencimento", "2026-06-15");
+        raw.put("codigo_tipo_conta", "4");
+        raw.put("codigo_conta", "100");
+        var result = mapper.normalize(raw, "P-T4", null, null, "4");
+        assertThat(result.canonical().get("counterpartyExternalId")).isEqualTo("CP-4-100");
+        assertThat(result.canonical().get("counterpartyType")).isEqualTo("INTERNAL");
+    }
+
+    // --- Payment tests ---
+
     @Test
     void paymentNormalizes() {
         var raw = new LinkedHashMap<String, Object>();

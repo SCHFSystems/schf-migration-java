@@ -38,7 +38,7 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
             "SELECT COUNT(*) FROM USUARIO WHERE EXCLUIDO IS NULL OR EXCLUIDO <> 'S'");
         queries.put("count-counterparties",
             "SELECT COUNT(*) FROM ("
-            + " SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 7, 15)"
+            + " SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15)"
             + " UNION"
             + " SELECT '3', CODIGO FROM FORNECEDOR"
             + " UNION"
@@ -52,7 +52,7 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
             "SELECT * FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6 AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') ORDER BY CODIGO_CONTA");
         queries.put("counterparties",
             "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM ("
-            + "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 7, 15) "
+            + "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15) "
             + "UNION "
             + "SELECT '3' AS CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME FROM FORNECEDOR "
             + "UNION "

@@ -21,14 +21,23 @@ Expected count: ~15,398
 ### Stage 2: All types
 No CODIGO_TIPO_CONTA restriction
 Expected count: ~39,161
-Requires counterparty resolution for types 2, 7, 15:
+Requires counterparty resolution for all types:
 
-| Type | Name | Canonical Type | Count | Resolution |
-|------|------|---------------|-------|------------|
-| 2 | MEDICOS | INTERNAL | 9 | CONTA table (type 2) |
-| 3 | FORNECEDOR | SUPPLIER | 15,398 | FORNECEDOR table |
-| 7 | FINANCEIRO | GOVERNMENT/OTHER | 21,778 | CONTAS table (type 7) |
-| 15 | COLABORADOR | EMPLOYEE | 1,976 | COLABORADOR table |
+| Type | Name | Canonical Type | Resolution |
+|------|------|---------------|------------|
+| 1 | COLABORADOR | EMPLOYEE | COLABORADOR table |
+| 2 | MEDICOS | INTERNAL | CONTAS table (type 2) |
+| 3 | FORNECEDOR | SUPPLIER | FORNECEDOR table |
+| 4 | (outros) | INTERNAL | CONTAS table (type 4) |
+| 5 | (outros) | INTERNAL | CONTAS table (type 5) |
+| 7 | FINANCEIRO | GOVERNMENT | CONTAS table (type 7) |
+| 9 | (outros) | INTERNAL | CONTAS table (type 9) |
+| 10 | (outros) | INTERNAL | CONTAS table (type 10) |
+| 11 | (outros) | INTERNAL | CONTAS table (type 11) |
+| 12 | (outros) | INTERNAL | CONTAS table (type 12) |
+| 13 | (outros) | INTERNAL | CONTAS table (type 13) |
+| 14 | (outros) | INTERNAL | CONTAS table (type 14) |
+| 15 | COLABORADOR | EMPLOYEE | COLABORADOR table |
 
 ## Temporal
 No period filter. Data ranges from 2000 to 2026.
@@ -67,8 +76,10 @@ PREVISTO_REALIZADO column is ALL NULL — not usable.
 Some records counted in multiple status queries. Use mutually exclusive filter logic.)
 
 ## Counterparty Entity
-Generated from CONTAS (types 2, 7, 15) + FORNECEDOR (type 3) + COLABORADOR (type 15).
+Generated from CONTAS (types 2, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15) + FORNECEDOR (type 3) + COLABORADOR (all types).
 Written to counterparties.ndjson in bundle format 1.1.
+
+The CONTAS filter previously only included types 2, 7, 15, which caused 43 payables with types 4, 5, 9, 10, 11, 12, 13, 14 to produce null counterpartyExternalId. The filter was widened to include all types handled by CounterpartyResolver for CONTAS resolution.
 
 ## Filters in both LIMITED_VALIDATION and FULL_EXTRACTION
 All filter conditions, mappers, external ID rules, and semantic transformations are identical

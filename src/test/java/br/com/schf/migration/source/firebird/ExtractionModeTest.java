@@ -129,7 +129,7 @@ class ExtractionModeTest {
     @Test
     void counterpartyQueryExists() {
         var catalog = new SghFirebird25QueryCatalog(ExtractionMode.LIMITED_VALIDATION);
-        assertThat(catalog.query("counterparties")).contains("CODIGO_TIPO_CONTA IN (2, 7, 15)");
+        assertThat(catalog.query("counterparties")).contains("CODIGO_TIPO_CONTA IN (2, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15)");
         assertThat(catalog.query("counterparties-suppliers")).contains("FORNECEDOR");
         assertThat(catalog.query("counterparties-colaboradores")).contains("COLABORADOR");
     }
