@@ -71,9 +71,13 @@ public class PayableLegacyMapper {
         }
 
         if (!warnings.isEmpty()) {
-            result.put("dateWarnings", warnings.stream().map(w ->
-                Map.of("code", w.code().name(), "field", w.field(), "rawValue", w.rawValue())
-            ).toList());
+            result.put("dateWarnings", warnings.stream().map(w -> {
+                var m = new LinkedHashMap<String, String>();
+                m.put("code", w.code().name());
+                m.put("field", w.field());
+                m.put("rawValue", w.rawValue());
+                return m;
+            }).toList());
         }
 
         return new PayableMappingResult(result, List.copyOf(warnings));

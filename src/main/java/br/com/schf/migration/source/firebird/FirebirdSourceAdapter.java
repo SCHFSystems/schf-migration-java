@@ -268,7 +268,8 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
         // Emit unresolved-legacy-reference counterparties for payable orphan keys
         var unresolvedKeys = canonicalMapper.counterpartyResolver().getUnresolvedKeys();
         if (!unresolvedKeys.isEmpty()) {
-            for (var key : unresolvedKeys) {
+            var sortedKeys = unresolvedKeys.stream().sorted().toList();
+            for (var key : sortedKeys) {
                 var parts = key.split("\\|", 2);
                 var tipo = parts[0];
                 var codigo = parts.length > 1 ? parts[1] : "";
