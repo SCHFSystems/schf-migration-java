@@ -47,7 +47,7 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
         if (!config.profile().isSgh()) return null;
         try (var conn = connectionFactory.openReadOnly()) {
             var allInfos = loadAllCounterpartyInfos(conn);
-            var resolver = new CounterpartyResolver(allInfos);
+            var resolver = new CounterpartyResolver(config.sourceInstanceId(), allInfos);
             return new CanonicalRecordMapper(SNAPSHOT_DATE, resolver);
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to initialize canonical mapper: " + ex.getMessage(), ex);

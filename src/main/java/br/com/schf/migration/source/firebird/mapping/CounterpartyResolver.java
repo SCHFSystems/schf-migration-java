@@ -4,13 +4,16 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public class CounterpartyResolver {
+    private final String sourceInstanceId;
     private final Map<String, CounterpartyInfo> allByTipoAndCodigo;
     private final Set<String> unresolvedKeys = new LinkedHashSet<>();
 
-    public CounterpartyResolver(
+    public CounterpartyResolver(String sourceInstanceId,
             Map<String, CounterpartyInfo> allByTipoAndCodigo) {
+        this.sourceInstanceId = sourceInstanceId.replace("-", "").toLowerCase();
         this.allByTipoAndCodigo = Map.copyOf(allByTipoAndCodigo);
     }
 
@@ -30,7 +33,9 @@ public class CounterpartyResolver {
 
         if (info == null) {
             unresolvedKeys.add(key);
-            return new ResolvedCounterparty(null, type, key, null);
+            var uuidKey = sourceInstanceId + "|UNRESOLVED_COUNTERPARTY|" + key;
+            var externalId = UUID.nameUUIDFromBytes(uuidKey.getBytes()).toString();
+            return new ResolvedCounterparty(externalId, type, key, null);
         }
         return new ResolvedCounterparty(info.externalId(), type, key, info.name());
     }
