@@ -2,8 +2,10 @@ package br.com.schf.migration.source.firebird;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.schf.migration.source.firebird.mapping.CanonicalRecordMapper;
 import br.com.schf.migration.source.firebird.mapping.CategoryLegacyMapper;
 import br.com.schf.migration.source.firebird.mapping.CounterpartyResolver;
+import br.com.schf.migration.source.firebird.mapping.CounterpartyType;
 import br.com.schf.migration.source.firebird.mapping.DateValidator;
 import br.com.schf.migration.source.firebird.mapping.FinancialAccountLegacyMapper;
 import br.com.schf.migration.source.firebird.mapping.PayableLegacyMapper;
@@ -382,6 +384,49 @@ class MapperTest {
         var result = mapper.normalize(raw, "P-T4", null, null, "4");
         assertThat(result.canonical().get("counterpartyExternalId")).isEqualTo("CP-4-100");
         assertThat(result.canonical().get("counterpartyType")).isEqualTo("INTERNAL");
+    }
+
+    // --- Unresolved counterparty tests ---
+
+    @Test
+    void resolverTracksUnresolvedKeys() {
+        var infos = Map.of("3|100", new CounterpartyResolver.CounterpartyInfo("EXT", "Known"));
+        var resolver = new CounterpartyResolver(infos);
+        resolver.resolve(3, "100"); // resolved
+        resolver.resolve(7, "999"); // unresolved
+        resolver.resolve(1, "888"); // unresolved
+        var keys = resolver.getUnresolvedKeys();
+        assertThat(keys).containsExactlyInAnyOrder("7|999", "1|888");
+    }
+
+    @Test
+    void resolverDoesNotDuplicateUnresolvedKeys() {
+        var resolver = new CounterpartyResolver(Map.of());
+        resolver.resolve(7, "111");
+        resolver.resolve(7, "111");
+        assertThat(resolver.getUnresolvedKeys()).hasSize(1);
+    }
+
+    @Test
+    void mapUnresolvedCounterpartySetsCorrectFields() {
+        var resolved = new CounterpartyResolver.ResolvedCounterparty(null, CounterpartyType.GOVERNMENT, "7|368", null);
+        var mapper = new CanonicalRecordMapper(SNAPSHOT, EMPTY_RESOLVER);
+        var result = mapper.mapUnresolvedCounterparty("ext-id", resolved, "a1b2c3d4");
+        assertThat(result.get("externalId")).isEqualTo("ext-id");
+        assertThat(result.get("name")).isEqualTo("Unresolved legacy counterparty — a1b2c3d4");
+        assertThat(result.get("type")).isEqualTo("GOVERNMENT");
+        assertThat(result.get("resolutionStatus")).isEqualTo("UNRESOLVED_LEGACY_REFERENCE");
+        assertThat(result.get("active")).isEqualTo(false);
+        assertThat(result.get("sourceReference")).isEqualTo("7|368");
+    }
+
+    @Test
+    void mapUnresolvedCounterpartyForEmployee() {
+        var resolved = new CounterpartyResolver.ResolvedCounterparty(null, CounterpartyType.EMPLOYEE, "15|5", null);
+        var mapper = new CanonicalRecordMapper(SNAPSHOT, EMPTY_RESOLVER);
+        var result = mapper.mapUnresolvedCounterparty("ext-emp", resolved, "e5f6g7h8");
+        assertThat(result.get("type")).isEqualTo("EMPLOYEE");
+        assertThat(result.get("active")).isEqualTo(false);
     }
 
     // --- Payment tests ---

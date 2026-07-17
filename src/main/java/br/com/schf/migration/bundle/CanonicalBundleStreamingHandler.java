@@ -105,11 +105,13 @@ public class CanonicalBundleStreamingHandler implements RecordHandler {
                     checksums.put(path, CanonicalBundleWriter.sha256(new byte[0]));
                 }
             }
+            var coreMinVer = BundleContract.isFormat12(bundleVersion)
+                ? BundleContract.CORE_MINIMUM_VERSION_1_2 : "0.1.0";
             var manifest = new BundleContract.Manifest(
                 bundleVersion, BundleContract.SCHEMA_VERSION,
                 sourceSystem != null ? sourceSystem : "unknown",
                 sourceInstanceId != null ? sourceInstanceId : UUID.randomUUID(),
-                OffsetDateTime.now(ZoneOffset.UTC), "schf-migration-java/0.1.0", "0.1.0",
+                OffsetDateTime.now(ZoneOffset.UTC), "schf-migration-java/0.1.0", coreMinVer,
                 orgExternalId != null ? orgExternalId : UUID.randomUUID(),
                 Map.copyOf(counts), Map.copyOf(checksums), anonymized, UUID.randomUUID());
             var manifestBytes = mapper.writeValueAsBytes(manifest);

@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class FirebirdSourceAdapter implements StreamingSourceAdapter {
     private static final LocalDate SNAPSHOT_DATE = LocalDate.of(2026, 7, 1);
@@ -263,6 +264,25 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
                 progress.recordsProcessed("payables", count);
             }
         }
+
+        // Emit unresolved-legacy-reference counterparties for payable orphan keys
+        var unresolvedKeys = canonicalMapper.counterpartyResolver().getUnresolvedKeys();
+        if (!unresolvedKeys.isEmpty()) {
+            for (var key : unresolvedKeys) {
+                var parts = key.split("\\|", 2);
+                var tipo = parts[0];
+                var codigo = parts.length > 1 ? parts[1] : "";
+                var uuidKey = config.sourceInstanceId().replace("-", "").toLowerCase()
+                    + "|UNRESOLVED_COUNTERPARTY|" + tipo + "|" + codigo;
+                var externalId = UUID.nameUUIDFromBytes(uuidKey.getBytes()).toString();
+                var tipoInt = Integer.parseInt(tipo);
+                var resolved = canonicalMapper.counterpartyResolver().resolve(tipoInt, codigo);
+                var shortHash = externalId.replace("-", "").substring(0, 8);
+                var canonical = canonicalMapper.mapUnresolvedCounterparty(externalId, resolved, shortHash);
+                handler.accept("counterparties", canonical);
+            }
+        }
+
         checkpoints.markCompleted("payables");
         checkpoints.markCompleted("payments");
         progress.phaseCompleted("payables");

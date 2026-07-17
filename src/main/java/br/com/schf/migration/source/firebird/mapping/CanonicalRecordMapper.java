@@ -81,6 +81,17 @@ public class CanonicalRecordMapper {
         return result;
     }
 
+    public Map<String, Object> mapUnresolvedCounterparty(String externalId, ResolvedCounterparty resolved, String shortHash) {
+        var result = new LinkedHashMap<String, Object>();
+        result.put("externalId", externalId);
+        result.put("name", "Unresolved legacy counterparty — " + shortHash);
+        result.put("type", resolved.type().name());
+        result.put("resolutionStatus", "UNRESOLVED_LEGACY_REFERENCE");
+        result.put("sourceReference", resolved.sourceReference());
+        result.put("active", false);
+        return result;
+    }
+
     public CounterpartyResolver counterpartyResolver() { return counterpartyResolver; }
     public LocalDate snapshotDate() { return snapshotDate; }
 }

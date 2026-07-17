@@ -1,10 +1,13 @@
 package br.com.schf.migration.source.firebird.mapping;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class CounterpartyResolver {
     private final Map<String, CounterpartyInfo> allByTipoAndCodigo;
+    private final Set<String> unresolvedKeys = new LinkedHashSet<>();
 
     public CounterpartyResolver(
             Map<String, CounterpartyInfo> allByTipoAndCodigo) {
@@ -25,8 +28,15 @@ public class CounterpartyResolver {
             default -> CounterpartyType.OTHER;
         };
 
-        if (info == null) return new ResolvedCounterparty(null, type, key, null);
+        if (info == null) {
+            unresolvedKeys.add(key);
+            return new ResolvedCounterparty(null, type, key, null);
+        }
         return new ResolvedCounterparty(info.externalId(), type, key, info.name());
+    }
+
+    public Set<String> getUnresolvedKeys() {
+        return Set.copyOf(unresolvedKeys);
     }
 
     public record CounterpartyInfo(String externalId, String name) {}

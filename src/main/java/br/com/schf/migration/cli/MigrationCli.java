@@ -86,7 +86,7 @@ public final class MigrationCli {
 
     private static String bundleVersionForFirebird(FirebirdSourceConfiguration config) {
         return config.profile() == SourceProfile.SGH_FIREBIRD_25
-            ? BundleContract.FORMAT_VERSION_1_1
+            ? BundleContract.FORMAT_VERSION_1_2
             : BundleContract.FORMAT_VERSION;
     }
 
