@@ -29,7 +29,7 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         queries.put("count-categories",
             "SELECT COUNT(*) FROM SFN_CLASSIFICACAO_FINANCEIRA WHERE EXCLUIR IS NULL OR EXCLUIR <> 'S'");
         queries.put("count-accounts",
-            "SELECT COUNT(*) FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6 AND (EXCLUIR IS NULL OR EXCLUIR <> 'S')");
+            "SELECT COUNT(*) FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6");
         queries.put("count-payables",
             "SELECT COUNT(*) FROM CONTAS_RECEBER_PAGAR WHERE RCB_PGT = 'P' AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0");
         queries.put("count-payments",
@@ -49,15 +49,15 @@ public class SghFirebird25QueryCatalog implements QueryCatalog {
         queries.put("categories",
             "SELECT * FROM SFN_CLASSIFICACAO_FINANCEIRA WHERE EXCLUIR IS NULL OR EXCLUIR <> 'S' ORDER BY ID_CLASSIFICACAO_FINANCEIRA");
         queries.put("financial-accounts",
-            "SELECT * FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6 AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') ORDER BY CODIGO_CONTA");
+            "SELECT * FROM CONTAS WHERE CODIGO_TIPO_CONTA = 6 ORDER BY CODIGO_CONTA");
         queries.put("counterparties",
             "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM ("
-            + "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15) "
+            + "SELECT CODIGO_TIPO_CONTA, CODIGO_CONTA, NOME, 'C' AS SRC FROM CONTAS WHERE (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND CODIGO_TIPO_CONTA IN (2, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15) "
             + "UNION "
-            + "SELECT '3' AS CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME FROM FORNECEDOR "
+            + "SELECT '3' AS CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME, 'F' AS SRC FROM FORNECEDOR "
             + "UNION "
-            + "SELECT CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME FROM COLABORADOR WHERE (DESATIVADO IS NULL OR DESATIVADO <> 'S')"
-            + ") src ORDER BY CODIGO_TIPO_CONTA, CODIGO_CONTA");
+            + "SELECT CODIGO_TIPO_CONTA, CODIGO AS CODIGO_CONTA, NOME, 'L' AS SRC FROM COLABORADOR WHERE (DESATIVADO IS NULL OR DESATIVADO <> 'S')"
+            + ") src ORDER BY CODIGO_TIPO_CONTA, CODIGO_CONTA, SRC");
         queries.put("counterparties-suppliers",
             "SELECT CODIGO AS CODIGO_CONTA, NOME, '3' AS CODIGO_TIPO_CONTA FROM FORNECEDOR");
         queries.put("counterparties-colaboradores",

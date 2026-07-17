@@ -224,7 +224,7 @@ public class FirebirdSourceAdapter implements StreamingSourceAdapter {
             + "CRP.VALOR, CRP.VALORPAGO, CRP.DATA_PAGAMENTO, CRP.COMPLEMENTO_HISTORICO AS HISTORICO, "
             + "CRP.DOC_RCB_PGT AS DOCUMENTO, CRP.FORMA_PR, CRP.PREVISTO_REALIZADO "
             + "FROM CONTAS_RECEBER_PAGAR CRP WHERE RCB_PGT = 'P' "
-            + "AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0 ORDER BY DATA_VENCIMENTO";
+            + "AND (EXCLUIR IS NULL OR EXCLUIR <> 'S') AND VALOR > 0 ORDER BY DATA_VENCIMENTO, CODIGO_TIPO_CONTA, CODIGO_CONTA, DOC_RCB_PGT";
 
         var max = catalog.maxRows("payables");
         try (var stmt = conn.prepareStatement(payablesFilter)) {
